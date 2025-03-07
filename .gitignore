@@ -4,3 +4,6 @@ db.sqlite3
 __pycache__
 .env
 .DS_Store
+cc.ko.300.kv
+cc.ko.300.kv.vectors.npy
+cc.ko.300.vec
