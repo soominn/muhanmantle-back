@@ -5,10 +5,11 @@ from gensim.models import KeyedVectors
 from .models import AnswerWord, BaseWord
 from django.db import IntegrityError
 import json
+from django.conf import settings
 
 # 모델 파일 경로
-VEC_FILE = "cc.ko.300.vec"
-KV_FILE = "cc.ko.300.kv"
+VEC_FILE = os.path.join(settings.BASE_DIR, 'cc.ko.300.vec')
+KV_FILE = os.path.join(settings.BASE_DIR, 'cc.ko.300.kv')
 
 # 전역 모델 변수 (한 번만 로드 후 계속 사용)
 model = None
