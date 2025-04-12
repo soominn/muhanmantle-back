@@ -120,7 +120,6 @@ def calculate_similarity(request, id, input_word):
 
         return JsonResponse({
             "id": id,
-            "answer_word": answer.answer_word,
             "input_word": input_word,
             "similarity_percentage": round(similarity_percentage, 2),
             "rank": rank
