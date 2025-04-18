@@ -6,6 +6,7 @@ from .models import AnswerWord, BaseWord
 from django.db import IntegrityError
 import json
 from django.conf import settings
+from config.utils import keep_model_warm
 
 # 모델 파일 경로
 VEC_FILE = os.path.join(settings.BASE_DIR, 'cc.ko.300.vec')
@@ -29,6 +30,9 @@ def load_model():
 
         # 변환된 모델을 저장
         model.save(KV_FILE)
+
+    # 모델 로드 후 메모리 유지용 워밍업 시작!
+    keep_model_warm(model)
 
 # 🚀 서버 시작 시 모델을 한 번 로드
 load_model()
