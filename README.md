@@ -96,6 +96,7 @@ muhanmantle-backend/
 │   └── word_scraper.py        # 단어 수집 크롤러
 │
 ├── manage.py                  # Django 명령어 실행 스크립트
+├── README.md                  # 프로젝트 설명 파일
 └── .gitignore                 # Git 추적 제외 파일 목록
 ```
 
