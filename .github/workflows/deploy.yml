@@ -1,0 +1,39 @@
+name: Deploy Backend
+
+on:
+  push:
+    branches:
+      - main  # 또는 배포 브랜치
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Deploy to Backend Server
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            echo "🔥 무한맨틀 백엔드 배포 시작"
+
+            # 1. 코드 업데이트
+            cd ~/projects/muhanmantle
+            git pull origin main
+
+            # 2. 가상환경 비활성화
+            deactivate
+
+            # 3. 패키지 설치 및 마이그레이션
+            # pip install -r requirements.txt
+            python manage.py migrate
+
+            # 4. 서버 재시작
+            sudo supervisorctl restart muhanmantle
+
+            echo "✅ 백엔드 배포 완료!"
