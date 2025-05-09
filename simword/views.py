@@ -110,7 +110,7 @@ def calculate_similarity(request, id, input_word):
             return JsonResponse({"error": f"Answer word '{answer.answer_word}' not found in the model."}, status=400)
 
         similarity_score = model.similarity(input_word, answer.answer_word)
-        similarity_percentage = max(0, min(similarity_score * 100, 100))
+        similarity_percentage = round(similarity_score * 100, 2)
 
         if similarity_percentage == 100:
             rank = "정답!"
@@ -125,9 +125,8 @@ def calculate_similarity(request, id, input_word):
         return JsonResponse({
             "id": id,
             "input_word": input_word,
-            "similarity_percentage": round(similarity_percentage, 2),
+            "similarity_percentage": similarity_percentage,
             "rank": rank
         })
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
-

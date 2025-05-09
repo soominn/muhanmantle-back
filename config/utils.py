@@ -1,5 +1,3 @@
-# config/utils.py
-
 import threading
 import time
 
@@ -14,7 +12,7 @@ def keep_model_warm(model, words=None, interval=600):
             try:
                 # 단어 리스트를 순회하면서 벡터를 가져와 메모리에 접근
                 for word in words:
-                    _ = model.get_word_vector(word)
+                    _ = model.get_vector(word)
             except Exception as e:
                 # 에러 발생 시 출력
                 print("keep_model_warm 에러:", e)
