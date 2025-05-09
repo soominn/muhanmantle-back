@@ -3,19 +3,23 @@
 import threading
 import time
 
-def keep_model_warm(model, word="hello", interval=600):
-    """
-    일정 간격으로 모델에 접근하여 메모리에서 스왑되지 않도록 유지하는 함수.
+def keep_model_warm(model, words=None, interval=600):
+    # 기본 단어 목록 설정 (None일 경우)
+    if words is None:
+        words = ["안녕", "세상", "빠른", "텍스트", "한국", "인공지능", "기억"]
 
-    :param model: fastText 모델 객체
-    :param word: 접근할 단어 (기본: "hello")
-    :param interval: 접근 주기 (초, 기본: 600초 = 10분)
-    """
+    # 모델을 주기적으로 접근하는 내부 함수
     def loop():
         while True:
             try:
-                _ = model.get_word_vector(word)
+                # 단어 리스트를 순회하면서 벡터를 가져와 메모리에 접근
+                for word in words:
+                    _ = model.get_word_vector(word)
             except Exception as e:
-                print("keep_model_warm error:", e)
+                # 에러 발생 시 출력
+                print("keep_model_warm 에러:", e)
+            # 지정한 시간(초)만큼 대기 후 다시 반복
             time.sleep(interval)
+
+    # 위 루프를 백그라운드 스레드로 실행 (프로그램 종료 시 자동 종료됨)
     threading.Thread(target=loop, daemon=True).start()
