@@ -1,9 +1,79 @@
-.idea
-db.sqlite3
-*.pyc
-__pycache__
+# ── Python bytecode / packages ───────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+share/python-wheels/
+*.manifest
+*.spec
+
+# ── Virtual environments ───────────────────────────────────────────────────────
+.venv/
+venv/
+env/
+ENV/
+
+# ── Distribution / build ─────────────────────────────────────────────────────
+build/
+dist/
+*.so
+
+# ── Environment / secrets ────────────────────────────────────────────────────
 .env
+.env.*
+!.env.example
+
+# ── Test / coverage ───────────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+hypothesis/
+
+# ── Type checkers / linters ───────────────────────────────────────────────────
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.ruff_cache/
+
+# ── Jupyter ───────────────────────────────────────────────────────────────────
+.ipynb_checkpoints/
+
+# ── ML artifacts (see models/README.md) ─────────────────────────────────────
+# Managed layout: models/fasttext/, models/embedding-cache/
+models/fasttext/*
+!models/fasttext/.gitkeep
+models/embedding-cache/*
+!models/embedding-cache/.gitkeep
+
+# Legacy: files sometimes left at repo root before models/ layout
+/cc.ko.300.vec
+/cc.ko.300.kv
+/cc.ko.300.kv.vectors.npy
+
+# Legacy ST cache path (default was here before models/embedding-cache/)
+.embedding_cache/
+
+# ── Local DB files ────────────────────────────────────────────────────────────
+*.sqlite3
+*.db
+
+# ── Docker (optional local overrides; compose file itself stays tracked) ───────
+docker-compose.override.yml
+
+# ── OS / editors ───────────────────────────────────────────────────────────────
 .DS_Store
-cc.ko.300.kv
-cc.ko.300.kv.vectors.npy
-cc.ko.300.vec
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# ── Logs ───────────────────────────────────────────────────────────────────────
+*.log

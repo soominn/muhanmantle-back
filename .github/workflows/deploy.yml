@@ -1,39 +1,57 @@
-name: Deploy Backend
+name: CI & Deploy
 
 on:
   push:
-    branches:
-      - main  # 또는 배포 브랜치
+    branches: [main]
+  pull_request:
+    branches: [main]
 
 jobs:
+  # ── Lint + test (runs on every push and PR) ─────────────────────────────
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run pytest
+        run: pytest -v --tb=short
+
+  # ── Deploy (only on push to main, after tests pass) ─────────────────────
   deploy:
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Deploy to Backend Server
+      - name: Deploy to server via SSH
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.SERVER_IP }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            echo "🔥 무한맨틀 백엔드 배포 시작"
+            set -e
+            echo "=== 무한맨틀 배포 시작 ==="
 
-            # 1. 코드 업데이트
-            cd ~/projects/muhanmantle
+            cd ~/projects/muhanmantle-back
             git pull origin main
 
-            # 2. 가상환경 비활성화
-            deactivate
+            source .venv/bin/activate
+            pip install -r requirements.txt
 
-            # 3. 패키지 설치 및 마이그레이션
-            # pip install -r requirements.txt
-            python manage.py migrate
+            # Apply any pending DB migrations
+            alembic upgrade head
 
-            # 4. 서버 재시작
+            # Restart app (supervisor must be configured)
             sudo supervisorctl restart muhanmantle
 
-            echo "✅ 백엔드 배포 완료!"
+            echo "=== 배포 완료 ==="
