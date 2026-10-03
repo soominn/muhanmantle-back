@@ -58,6 +58,12 @@ def _resolve_row(request: Request, response: Response, db: Session):
     return row
 
 
+@router.get("/shout-ranking")
+def get_shout_ranking(db: Session = Depends(get_db)):
+    """Global guess counts. No session cookie is required or created."""
+    return gss.shout_ranking(db)
+
+
 @router.get("/session")
 def get_session(request: Request, response: Response, db: Session = Depends(get_db)):
     row = _resolve_row(request, response, db)

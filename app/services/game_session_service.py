@@ -18,6 +18,9 @@ from app.utils.word_input import is_valid_korean_word
 # Normalized embedding cosine is in [-1, 1]; treat as correct when numerically ~1.
 _COSINE_FULL_SCORE_TOL = 1e-3
 
+# Global shout board. Not scoped to the current answer.
+SHOUT_RANKING_LIMIT = 20
+
 
 def _guess_cosine_similarity(g: dict[str, Any]) -> float:
     if "similarity" in g and g["similarity"] is not None:
@@ -178,6 +181,12 @@ def give_up(db: Session, row: GameSession) -> dict[str, Any]:
     return state_with_reveal(db, row)
 
 
+def shout_ranking(db: Session) -> dict[str, Any]:
+    """Words submitted by any session on any puzzle. One count per session per word."""
+    ranked = GameSessionRepository.shout_ranking(db, SHOUT_RANKING_LIMIT)
+    return {"items": [{"word": word, "count": count} for word, count in ranked]}
+
+
 def submit_guess(
     db: Session,
     row: GameSession,
@@ -241,5 +250,7 @@ def submit_guess(
         row.is_correct = True
         row.correct_attempt_count = len(guesses) + 1
 
+    # Once per session per word, including a later puzzle and a correct guess.
+    GameSessionRepository.record_shout(db, row.id, word)
     GameSessionRepository.save(db, row)
     return public_state(db, row), False
