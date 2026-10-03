@@ -98,9 +98,3 @@ def post_give_up(request: Request, response: Response, db: Session = Depends(get
         raise HTTPException(status_code=400, detail=str(e)) from e
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
-
-
-@router.get("/session/shout-ranking")
-def get_shout_ranking(request: Request, response: Response, db: Session = Depends(get_db)):
-    row = _resolve_row(request, response, db)
-    return gss.shout_ranking(db, row)

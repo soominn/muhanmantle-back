@@ -18,9 +18,6 @@ from app.utils.word_input import is_valid_korean_word
 # Normalized embedding cosine is in [-1, 1]; treat as correct when numerically ~1.
 _COSINE_FULL_SCORE_TOL = 1e-3
 
-# Top shouts returned for the current answer. Enough for the sidebar, not the whole vocabulary.
-SHOUT_RANKING_LIMIT = 20
-
 
 def _guess_cosine_similarity(g: dict[str, Any]) -> float:
     if "similarity" in g and g["similarity"] is not None:
@@ -181,16 +178,6 @@ def give_up(db: Session, row: GameSession) -> dict[str, Any]:
     return state_with_reveal(db, row)
 
 
-def shout_ranking(db: Session, row: GameSession) -> dict[str, Any]:
-    """Count of distinct sessions that submitted each word for this session's answer."""
-    if row.answer_id is None:
-        return {"items": []}
-    ranked = GameSessionRepository.shout_ranking(
-        db, int(row.answer_id), SHOUT_RANKING_LIMIT
-    )
-    return {"items": [{"word": word, "count": count} for word, count in ranked]}
-
-
 def submit_guess(
     db: Session,
     row: GameSession,
@@ -254,8 +241,5 @@ def submit_guess(
         row.is_correct = True
         row.correct_attempt_count = len(guesses) + 1
 
-    # Same session + same word is stored once, including a correct guess.
-    # Give-up does not insert the answer here; only an actual submission counts.
-    GameSessionRepository.record_shout(db, row.id, int(aid), word)
     GameSessionRepository.save(db, row)
     return public_state(db, row), False
