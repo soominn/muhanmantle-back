@@ -31,7 +31,7 @@ def test_seed_notice_is_returned_without_a_session(client, db):
     notice = next(item for item in payload["items"] if item["slug"] == "2026-10-03-update")
     assert notice == {
         "slug": "2026-10-03-update",
-        "title": "업데이트",
+        "title": "2026-10-03 업데이트 공지",
         "date": "2026-10-03",
         "body": SEEDED_BODY,
     }
