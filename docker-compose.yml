@@ -1,6 +1,38 @@
+# Production API via `podman compose` / `podman-compose`.
+# The API uses the host network and binds 127.0.0.1:8000 (see BIND_* in .env).
+# MariaDB stays on the host; do not start the local-db profile on the server.
+
+name: muhanmantle
+
 services:
+  api:
+    build:
+      context: .
+      dockerfile: Containerfile
+    image: localhost/muhanmantle-back:latest
+    container_name: muhanmantle-api
+    restart: unless-stopped
+    network_mode: host
+    env_file:
+      - .env
+    environment:
+      BIND_HOST: ${BIND_HOST:-127.0.0.1}
+      BIND_PORT: ${BIND_PORT:-8000}
+    volumes:
+      - ./models:/app/models:Z
+    healthcheck:
+      test: ["CMD", "python", "/app/docker/healthcheck.py"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 600s
+
+  # Optional MariaDB for laptops. Not used in production.
+  #   podman compose --profile local-db up -d db
+  # Host port is 3307 so it does not collide with a host MariaDB on 3306.
   db:
-    image: mariadb:11
+    profiles: ["local-db"]
+    image: docker.io/library/mariadb:11
     container_name: muhanmantle-db
     restart: unless-stopped
     environment:
@@ -9,7 +41,7 @@ services:
       MARIADB_PASSWORD: ${DB_PASSWORD}
       MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
     ports:
-      - "3306:3306"
+      - "127.0.0.1:3307:3306"
     volumes:
       - mariadb_data:/var/lib/mysql
     healthcheck:

@@ -23,6 +23,10 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Run pytest
+        env:
+          # Settings() requires DATABASE_URL at import. Tests never connect:
+          # they override get_db with in-memory SQLite. Not a real credential.
+          DATABASE_URL: mysql+pymysql://ci:ci@127.0.0.1:3306/ci
         run: pytest -v --tb=short
 
   # ── Deploy (only on push to main, after tests pass) ─────────────────────
@@ -30,6 +34,10 @@ jobs:
     needs: test
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    timeout-minutes: 90
+    concurrency:
+      group: muhanmantle-back-deploy
+      cancel-in-progress: false
 
     steps:
       - name: Deploy to server via SSH
@@ -38,20 +46,56 @@ jobs:
           host: ${{ secrets.SERVER_IP }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          command_timeout: 60m
+          script_stop: true
           script: |
-            set -e
+            set -euo pipefail
             echo "=== 무한맨틀 배포 시작 ==="
 
             cd ~/projects/muhanmantle-back
             git pull origin main
 
-            source .venv/bin/activate
-            pip install -r requirements.txt
+            if podman compose version >/dev/null 2>&1; then
+              compose() { podman compose "$@"; }
+            elif command -v podman-compose >/dev/null 2>&1; then
+              compose() { podman-compose "$@"; }
+            else
+              echo "podman compose 또는 podman-compose 가 필요합니다. docs/podman-migration.md 를 보세요."
+              exit 1
+            fi
 
-            # Apply any pending DB migrations
-            alembic upgrade head
+            compose build
 
-            # Restart app (supervisor must be configured)
-            sudo supervisorctl restart muhanmantle
+            # Migrate with the new image before replacing the running container.
+            # Host network so 127.0.0.1 in DATABASE_URL is the host MariaDB.
+            podman rm -f muhanmantle-migrate >/dev/null 2>&1 || true
+            podman run --rm --network host --env-file .env \
+              --name muhanmantle-migrate \
+              localhost/muhanmantle-back:latest \
+              alembic upgrade head
+
+            compose up -d --force-recreate --remove-orphans
+
+            bind_port=$(python3 -c "import pathlib; p=pathlib.Path('.env'); print(next((l.split('=',1)[1].strip().strip(chr(34)).strip(chr(39)) for l in p.read_text().splitlines() if l.strip().startswith('BIND_PORT=')), '8000') if p.exists() else '8000')")
+            case "${bind_port}" in
+              ''|*[!0-9]*) echo "BIND_PORT 가 숫자가 아닙니다: ${bind_port}"; exit 1 ;;
+            esac
+
+            echo "=== 헬스 체크 http://127.0.0.1:${bind_port}/health ==="
+            ok=0
+            for i in $(seq 1 60); do
+              running=$(podman inspect -f '{{.State.Running}}' muhanmantle-api 2>/dev/null || echo false)
+              if [ "${running}" = "true" ] && python3 -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:${bind_port}/health', timeout=5).read()"; then
+                ok=1
+                break
+              fi
+              echo "대기 중 (${i}/60), container running=${running}"
+              sleep 10
+            done
+            if [ "${ok}" != "1" ]; then
+              echo "헬스 체크 실패"
+              podman logs --tail 80 muhanmantle-api || true
+              exit 1
+            fi
 
             echo "=== 배포 완료 ==="
