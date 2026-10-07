@@ -29,7 +29,7 @@ API를 서버에 직접 깔아 `supervisor`로 띄우던 방식에서 Podman 컨
 | 80, 443 | 호스트 Nginx. 프론트 정적 파일과 API 프록시 |
 | 127.0.0.1:8000 | 이 API. Nginx `proxy_pass` 대상 |
 | 3306 | 호스트 MariaDB. 컨테이너가 포트를 추가로 열지 않음 |
-| 127.0.0.1:3307 | 선택 사항. `local-db` 프로필의 개발용 MariaDB. 운영에서 켜지 않음 |
+| 127.0.0.1:3307 | 선택 사항. `compose.local-db.yml`의 개발용 MariaDB. 운영에서 켜지 않음 |
 
 `soomin-hub`와 `url-link-cards`는 2026-10-07 기준으로 GitHub에서 공개 저장소로 열리지 않아(404) 그쪽 호스트 포트를 확인하지 못했다. 이 API는 새 포트를 잡지 않고 기존 8000을 유지한다. 프론트 컨테이너를 따로 띄울 때도 호스트의 `127.0.0.1:8000`은 이 API 전용으로 둔다.
 
@@ -200,13 +200,13 @@ python3 -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.
 
 ## 로컬에서 DB만 컨테이너로
 
-운영 서버에서는 하지 않는다. 노트북에서만:
+운영 서버에서는 하지 않는다. 노트북에서만, 운영용 `docker-compose.yml`과 별도 파일이다. `podman-compose` 1.0.6은 Compose profile을 무시해서, 개발용 DB를 같은 파일에 두면 `up`이 서버에서도 MariaDB 컨테이너를 띄운다.
 
 ```bash
-podman compose --profile local-db up -d db
+podman compose -f compose.local-db.yml up -d
 ```
 
-이때 `DATABASE_URL` 포트는 `3307`이다. API까지 컨테이너로 띄우려면 호스트에 MariaDB가 있거나, URL이 컨테이너에서 도달하는 주소여야 한다. 운영 조합은 호스트 MariaDB + 호스트 네트워크다.
+이때 `DATABASE_URL` 포트는 `3307`이다. `DB_PASSWORD`와 `DB_ROOT_PASSWORD`가 필요하다. API까지 컨테이너로 띄우려면 호스트에 MariaDB가 있거나, URL이 컨테이너에서 도달하는 주소여야 한다. 운영 조합은 호스트 MariaDB + 호스트 네트워크다.
 
 ## 이미지 크기
 

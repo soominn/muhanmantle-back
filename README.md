@@ -58,6 +58,7 @@ muhanmantle-back/
 ├── alembic/versions/              # 0001–0003
 ├── Containerfile                  # API 이미지
 ├── docker-compose.yml             # podman compose (호스트 네트워크, 127.0.0.1:8000)
+├── compose.local-db.yml           # 노트북용 MariaDB (운영에서 실행하지 않음)
 ├── docker/entrypoint.sh
 ├── docs/podman-migration.md       # 서버 이전 절차
 ├── scripts/
