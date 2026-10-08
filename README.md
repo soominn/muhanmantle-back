@@ -168,6 +168,8 @@ pytest -v
 
 SQLite 인메모리 DB + 모의 모델 사용 — MariaDB나 실제 모델 파일 불필요.
 
+CI가 없다. 서버에 배포하기 전에 로컬에서 `pytest -v`를 실행하는 것을 권장한다.
+
 ---
 
 ## 프로덕션 배포
@@ -175,6 +177,29 @@ SQLite 인메모리 DB + 모의 모델 사용 — MariaDB나 실제 모델 파�
 API는 Podman 컨테이너로 띄운다. 호스트 네트워크에서 `127.0.0.1:8000`에만 바인드하고, 호스트 Nginx가 그 주소로 프록시한다. MariaDB는 호스트에 둔다. 모델 파일은 `models/` 볼륨이다.
 
 서버에서 한 번 할 일(Podman 설치, `.env`, 모델 배치, `supervisor`의 `muhanmantle` 중지, 첫 기동, 롤백)은 [docs/podman-migration.md](docs/podman-migration.md)에 있다.
+
+갱신은 서버에서 수동으로 한다. `podman compose`가 없으면 같은 인자에 `podman-compose`를 쓴다. 헬스 체크는 `.env`의 `BIND_PORT`(없으면 8000)로 `http://127.0.0.1:${BIND_PORT}/health`를 본다. 모델 로드 전에는 `/health`가 응답하지 않을 수 있다. 그때는 `podman logs muhanmantle-api`를 본다.
+
+```bash
+cd ~/projects/muhanmantle-back
+git pull origin main
+podman compose build
+podman rm -f muhanmantle-migrate >/dev/null 2>&1 || true
+podman run --rm --network host --env-file .env \
+  --name muhanmantle-migrate \
+  localhost/muhanmantle-back:latest \
+  alembic upgrade head
+podman compose up -d --force-recreate --remove-orphans
+bind_port=8000
+if [ -f .env ]; then
+  parsed=$(grep -E '^[[:space:]]*BIND_PORT=' .env | tail -n 1 | cut -d= -f2- | tr -d " \"'")
+  if [ -n "${parsed}" ]; then
+    bind_port="${parsed}"
+  fi
+fi
+python3 -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:${bind_port}/health', timeout=5).read())"
+podman logs --tail 80 muhanmantle-api
+```
 
 컨테이너가 실행하는 명령은 다음과 같다. 워커당 FastText 모델이 수 GB이므로 2워커면 메모리를 그에 맞게 둔다.
 

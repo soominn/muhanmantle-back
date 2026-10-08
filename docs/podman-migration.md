@@ -35,9 +35,9 @@ API를 서버에 직접 깔아 `supervisor`로 띄우던 방식에서 Podman 컨
 
 ## 서버에서 한 번만 할 일
 
-아래는 SSH로 배포 계정에 들어간 뒤의 순서다. GitHub Actions 시크릿 이름(`SERVER_IP`, `SSH_USERNAME`, `SSH_PRIVATE_KEY`)은 바뀌지 않는다.
+아래는 서버의 배포 계정에서 한 번만 하는 순서다.
 
-이 변경이 `main`에 들어가 워크플로가 돌기 **전에** 5번(supervisor 중지)까지 끝내야 한다. 예전 프로세스가 8000을 잡고 있으면 새 컨테이너가 뜨지 못하고 배포 잡이 실패한다.
+첫 기동(6번) 전에 5번(supervisor 중지)까지 끝내야 한다. 예전 프로세스가 8000을 잡고 있으면 새 컨테이너가 뜨지 못한다.
 
 ### 1. Podman 설치
 
@@ -49,7 +49,7 @@ sudo apt-get install -y podman
 podman compose version || sudo apt-get install -y podman-compose
 ```
 
-`podman compose version`이 되면 내장 명령을 쓴다. 안 되면 `podman-compose` 패키지를 설치한다. 배포 스크립트는 둘 다 인식한다.
+`podman compose version`이 되면 내장 명령을 쓴다. 안 되면 `podman-compose` 패키지를 설치한다. 이후 배포도 둘 중 설치되어 있는 쪽을 쓴다.
 
 rootless(권장)로 SSH 사용자 계정에서 `podman info`가 되면 된다. Ubuntu 패키지는 보통 `/etc/subuid`, `/etc/subgid`를 만들어 준다.
 
@@ -165,15 +165,44 @@ location /health { proxy_pass http://127.0.0.1:8000; }
 
 ## 이후 배포
 
-`main`에 푸시되면 테스트 잡 통과 후 SSH로 다음을 한다.
+코드를 갱신할 때마다 서버에서 아래를 직접 실행한다. CI가 없으므로, 배포 전에 개발 머신에서 `pytest -v`를 실행하는 것을 권장한다.
 
-1. `~/projects/muhanmantle-back`에서 `git pull origin main`
-2. 이미지 빌드
-3. 새 이미지로 `alembic upgrade head` (이름 `muhanmantle-migrate`, 끝나면 삭제)
-4. `muhanmantle-api` 재생성
-5. 컨테이너가 running이고 `http://127.0.0.1:$BIND_PORT/health`가 응답할 때까지 최대 약 10분 대기. 실패하면 잡이 실패하고 로그 끝을 출력한다
+`podman compose version`이 되면 `podman compose`를 쓴다. 안 되면 같은 인자에 `podman-compose`를 쓴다. 아래는 `podman compose` 기준이다.
 
-모델이 크면 헬스 체크까지 시간이 걸린다. 앱이 뜨기 전에는 `/health`도 응답하지 않는다.
+```bash
+cd ~/projects/muhanmantle-back
+git pull origin main
+
+podman compose build
+
+# 실행 중인 컨테이너를 바꾸기 전에 새 이미지로 마이그레이션한다.
+# 호스트 네트워크라 DATABASE_URL의 127.0.0.1이 호스트 MariaDB다.
+podman rm -f muhanmantle-migrate >/dev/null 2>&1 || true
+podman run --rm --network host --env-file .env \
+  --name muhanmantle-migrate \
+  localhost/muhanmantle-back:latest \
+  alembic upgrade head
+
+podman compose up -d --force-recreate --remove-orphans
+```
+
+`muhanmantle-migrate`는 `--rm`이라 마이그레이션이 끝나면 지워진다. `up`은 `muhanmantle-api`를 다시 만든다.
+
+헬스 체크. `.env`에 `BIND_PORT`가 없으면 8000이다. FastText 로드는 수 분, 길면 약 10분이 걸릴 수 있다. 앱이 뜨기 전에는 `/health`도 응답하지 않는다.
+
+```bash
+bind_port=8000
+if [ -f .env ]; then
+  parsed=$(grep -E '^[[:space:]]*BIND_PORT=' .env | tail -n 1 | cut -d= -f2- | tr -d " \"'")
+  if [ -n "${parsed}" ]; then
+    bind_port="${parsed}"
+  fi
+fi
+python3 -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:${bind_port}/health', timeout=5).read())"
+podman logs --tail 80 muhanmantle-api
+```
+
+`{"status": "ok"}`가 나오면 된다. 응답이 없거나 컨테이너가 바로 죽으면 `podman logs muhanmantle-api`로 원인을 본다.
 
 공지 마크다운(`notices/`)을 수정하면 다음 배포의 이미지 빌드에 포함된다. 컨테이너를 재시작만 해서는 이미지 안의 파일이 바뀌지 않는다.
 
