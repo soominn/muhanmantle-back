@@ -1,22 +1,31 @@
-services:
-  db:
-    image: mariadb:11
-    container_name: muhanmantle-db
-    restart: unless-stopped
-    environment:
-      MARIADB_DATABASE: ${DB_NAME}
-      MARIADB_USER: ${DB_USER}
-      MARIADB_PASSWORD: ${DB_PASSWORD}
-      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
-    ports:
-      - "3306:3306"
-    volumes:
-      - mariadb_data:/var/lib/mysql
-    healthcheck:
-      test: ["CMD-SHELL", "mariadb-admin ping -h 127.0.0.1 -uroot -p$$DB_ROOT_PASSWORD"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
+# Production API via `podman compose` / `podman-compose`.
+# Host network, process binds 127.0.0.1:8000 (BIND_* in .env).
+# MariaDB stays on the host. A laptop-only database file is compose.local-db.yml.
+# podman-compose 1.0.6 ignores Compose profiles, so the database is not a
+# service in this file: `up` must not start a second MariaDB on the server.
 
-volumes:
-  mariadb_data:
+name: muhanmantle
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Containerfile
+    image: localhost/muhanmantle-back:latest
+    container_name: muhanmantle-api
+    restart: unless-stopped
+    network_mode: host
+    env_file:
+      - .env
+    environment:
+      BIND_HOST: ${BIND_HOST:-127.0.0.1}
+      BIND_PORT: ${BIND_PORT:-8000}
+    volumes:
+      - ./models:/app/models:Z
+    # String form: podman-compose 1.0.6 mis-quotes a CMD list ("python' '/path").
+    healthcheck:
+      test: python /app/docker/healthcheck.py
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 600s

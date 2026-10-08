@@ -1,0 +1,29 @@
+# Optional MariaDB for a laptop. Do not run this on the production server.
+#   podman compose -f compose.local-db.yml up -d
+# Listens on 127.0.0.1:3307 so it does not take the host MariaDB port 3306.
+# Point DATABASE_URL at port 3307 when using it.
+
+name: muhanmantle-local-db
+
+services:
+  db:
+    image: docker.io/library/mariadb:11
+    container_name: muhanmantle-db
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: ${DB_NAME:-muhanmantle}
+      MARIADB_USER: ${DB_USER:-muhanmantle}
+      MARIADB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD}
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?set DB_ROOT_PASSWORD}
+    ports:
+      - "127.0.0.1:3307:3306"
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mariadb-admin ping -h 127.0.0.1 -uroot -p$$DB_ROOT_PASSWORD"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  mariadb_data:

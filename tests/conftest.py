@@ -11,6 +11,12 @@ import os
 
 # Force FastText mock path; a developer .env with sentence_transformer must not break tests
 os.environ["SIMILARITY_BACKEND"] = "fasttext"
+# Settings() requires DATABASE_URL at import. Tests never connect to it;
+# get_db is overridden with in-memory SQLite. Placeholder only — not a secret.
+os.environ.setdefault(
+    "DATABASE_URL",
+    "mysql+pymysql://ci:ci@127.0.0.1:3306/ci",
+)
 
 from unittest.mock import MagicMock, patch
 

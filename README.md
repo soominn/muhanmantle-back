@@ -56,6 +56,11 @@ muhanmantle-back/
 │       ├── simword_repository.py
 │       └── game_session_repository.py
 ├── alembic/versions/              # 0001–0003
+├── Containerfile                  # API 이미지
+├── docker-compose.yml             # podman compose (호스트 네트워크, 127.0.0.1:8000)
+├── compose.local-db.yml           # 노트북용 MariaDB (운영에서 실행하지 않음)
+├── docker/entrypoint.sh
+├── docs/podman-migration.md       # 서버 이전 절차
 ├── scripts/
 │   ├── download_wordlists.py
 │   ├── seed_words.py
@@ -151,19 +156,21 @@ SQLite 인메모리 DB + 모의 모델 사용 — MariaDB나 실제 모델 파�
 
 ## 프로덕션 배포
 
-### Gunicorn + uvicorn
+API는 Podman 컨테이너로 띄운다. 호스트 네트워크에서 `127.0.0.1:8000`에만 바인드하고, 호스트 Nginx가 그 주소로 프록시한다. MariaDB는 호스트에 둔다. 모델 파일은 `models/` 볼륨이다.
+
+서버에서 한 번 할 일(Podman 설치, `.env`, 모델 배치, `supervisor`의 `muhanmantle` 중지, 첫 기동, 롤백)은 [docs/podman-migration.md](docs/podman-migration.md)에 있다.
+
+컨테이너가 실행하는 명령은 다음과 같다. 워커당 FastText 모델이 수 GB이므로 2워커면 메모리를 그에 맞게 둔다.
 
 ```bash
 gunicorn app.main:app \
   --workers 2 \
   --worker-class uvicorn.workers.UvicornWorker \
-  --bind 0.0.0.0:8000 \
+  --bind 127.0.0.1:8000 \
   --timeout 120
 ```
 
-> 워커당 FastText 모델 ~3 GB 로드. 2워커 기준 ~6 GB RAM 필요.
-
-### Nginx
+Nginx (`BIND_PORT`를 바꾸지 않았다면 수정하지 않는다):
 
 ```nginx
 location /api/ {
