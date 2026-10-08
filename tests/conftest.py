@@ -55,6 +55,7 @@ from app.main import app               # noqa: E402
 from app.models.answer_word import AnswerWord  # noqa: F401, E402
 from app.models.base_word import BaseWord  # noqa: F401, E402
 from app.models.game_session import GameSession  # noqa: F401, E402
+from app.models.game_shout import GameShout  # noqa: F401, E402
 
 # ── In-memory SQLite DB ──────────────────────────────────────────────────────
 # StaticPool forces all sessions to share one physical connection, so tables

@@ -19,6 +19,7 @@ from app.db.base import Base
 import app.models.answer_word  # noqa: F401 — registers model on Base.metadata
 import app.models.base_word  # noqa: F401
 import app.models.game_session  # noqa: F401
+import app.models.game_shout  # noqa: F401
 import app.models.base_word_candidate  # noqa: F401
 
 config = context.config

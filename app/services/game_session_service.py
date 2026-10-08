@@ -18,6 +18,9 @@ from app.utils.word_input import is_valid_korean_word
 # Normalized embedding cosine is in [-1, 1]; treat as correct when numerically ~1.
 _COSINE_FULL_SCORE_TOL = 1e-3
 
+# Global shout board. Not scoped to the current answer.
+SHOUT_RANKING_LIMIT = 20
+
 
 def _guess_cosine_similarity(g: dict[str, Any]) -> float:
     if "similarity" in g and g["similarity"] is not None:
@@ -71,6 +74,7 @@ def sort_guesses(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def public_state(db: Session, row: GameSession) -> dict[str, Any]:
+    """Fields shared by session, guess, and reset. Never includes the answer word."""
     return {
         "session_id": row.id,
         "answer_id": row.answer_id,
@@ -79,6 +83,26 @@ def public_state(db: Session, row: GameSession) -> dict[str, Any]:
         "is_correct": bool(row.is_correct),
         "correct_attempt_count": int(row.correct_attempt_count or 0),
     }
+
+
+def _revealed_answer(db: Session, row: GameSession) -> dict[str, Any] | None:
+    """Screen number + answer word, only after give-up. `number` is `answer_id`.
+
+    The frontend already renders `answer_id` as "N번째 정답", so give-up uses that same N.
+    """
+    if not row.gave_up or row.answer_id is None:
+        return None
+    answer = SimwordRepository.get_answer_by_id(db, int(row.answer_id))
+    if answer is None:
+        return None
+    return {"number": int(row.answer_id), "word": answer.answer_word}
+
+
+def state_with_reveal(db: Session, row: GameSession) -> dict[str, Any]:
+    """public_state plus `revealed_answer` (`null` until this puzzle was given up)."""
+    state = public_state(db, row)
+    state["revealed_answer"] = _revealed_answer(db, row)
+    return state
 
 
 def create_new_session_row(db: Session, total: int) -> GameSession:
@@ -92,6 +116,7 @@ def create_new_session_row(db: Session, total: int) -> GameSession:
                 guesses=[],
                 is_correct=False,
                 correct_attempt_count=0,
+                gave_up=False,
             ),
         )
     new_id, history = pick_answer_id(total, [])
@@ -104,6 +129,7 @@ def create_new_session_row(db: Session, total: int) -> GameSession:
             guesses=[],
             is_correct=False,
             correct_attempt_count=0,
+            gave_up=False,
         ),
     )
 
@@ -126,6 +152,7 @@ def reset_session(db: Session, row: GameSession) -> GameSession:
         row.guesses = []
         row.is_correct = False
         row.correct_attempt_count = 0
+        row.gave_up = False
         return GameSessionRepository.save(db, row)
 
     prev = [int(x) for x in (row.answer_history or [])]
@@ -135,7 +162,29 @@ def reset_session(db: Session, row: GameSession) -> GameSession:
     row.guesses = []
     row.is_correct = False
     row.correct_attempt_count = 0
+    row.gave_up = False
     return GameSessionRepository.save(db, row)
+
+
+def give_up(db: Session, row: GameSession) -> dict[str, Any]:
+    """Reveal the current answer and keep that disclosure on the session."""
+    if row.answer_id is None:
+        raise ValueError("no active answer")
+
+    answer = SimwordRepository.get_answer_by_id(db, int(row.answer_id))
+    if answer is None:
+        raise LookupError("answer not found")
+
+    if not row.gave_up:
+        row.gave_up = True
+        GameSessionRepository.save(db, row)
+    return state_with_reveal(db, row)
+
+
+def shout_ranking(db: Session) -> dict[str, Any]:
+    """Words submitted by any session on any puzzle. One count per session per word."""
+    ranked = GameSessionRepository.shout_ranking(db, SHOUT_RANKING_LIMIT)
+    return {"items": [{"word": word, "count": count} for word, count in ranked]}
 
 
 def submit_guess(
@@ -201,5 +250,7 @@ def submit_guess(
         row.is_correct = True
         row.correct_attempt_count = len(guesses) + 1
 
+    # Once per session per word, including a later puzzle and a correct guess.
+    GameSessionRepository.record_shout(db, row.id, word)
     GameSessionRepository.save(db, row)
     return public_state(db, row), False

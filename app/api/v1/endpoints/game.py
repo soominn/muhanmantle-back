@@ -58,10 +58,17 @@ def _resolve_row(request: Request, response: Response, db: Session):
     return row
 
 
+@router.get("/shout-ranking")
+def get_shout_ranking(db: Session = Depends(get_db)):
+    """Global guess counts. No session cookie is required or created."""
+    return gss.shout_ranking(db)
+
+
 @router.get("/session")
 def get_session(request: Request, response: Response, db: Session = Depends(get_db)):
     row = _resolve_row(request, response, db)
-    return gss.public_state(db, row)
+    # revealed_answer stays null until give-up, then survives refresh.
+    return gss.state_with_reveal(db, row)
 
 
 @router.post("/session/guess")
@@ -85,4 +92,15 @@ def post_guess(
 def post_reset(request: Request, response: Response, db: Session = Depends(get_db)):
     row = _resolve_row(request, response, db)
     row = gss.reset_session(db, row)
-    return gss.public_state(db, row)
+    return gss.state_with_reveal(db, row)
+
+
+@router.post("/session/give-up")
+def post_give_up(request: Request, response: Response, db: Session = Depends(get_db)):
+    row = _resolve_row(request, response, db)
+    try:
+        return gss.give_up(db, row)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e

@@ -127,9 +127,25 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 | Method | Path | 설명 |
 |--------|------|------|
 | `GET` | `/health` | 헬스 체크 → `{"status": "ok"}` |
-| `GET` | `/api/game/session` | 세션 조회/없으면 생성 (Set-Cookie) |
-| `POST` | `/api/game/session/guess` | 입력 단어 제출 + 유사도/순위 계산 |
-| `POST` | `/api/game/session/reset` | 다음 문제로 초기화 |
+| `GET` | `/api/game/session` | 세션 조회/없으면 생성 (Set-Cookie). `revealed_answer`는 포기 전 `null` |
+| `POST` | `/api/game/session/guess` | 입력 단어 제출 + 유사도/순위 계산. 정답 단어는 넣지 않음 |
+| `POST` | `/api/game/session/reset` | 다음 문제로 초기화 (포기 공개도 해제) |
+| `POST` | `/api/game/session/give-up` | 현재 퍼즐 포기. public_state + `revealed_answer` |
+| `GET` | `/api/game/shout-ranking` | 모든 퍼즐의 추측 단어 순위. 세션 불필요 |
+
+### 포기
+
+`POST /api/game/session/give-up` 응답은 기존 세션 필드와 `revealed_answer`다.
+
+```json
+{ "number": 12, "word": "사과" }
+```
+
+`number`는 화면에 이미 보이는 N번째 정답의 N이며, 프론트가 쓰는 `answer_id`와 같다. 포기 전에는 `revealed_answer`가 `null`이고 guess 응답에는 정답 단어를 넣지 않는다. 포기 후에는 세션에 남아 새로고침(`GET /api/game/session`)에도 같은 공개가 유지된다.
+
+### 외침 순위
+
+`GET /api/game/shout-ranking`은 세션 없이 호출한다. 모든 퍼즐에 제출된 추측 단어를 집계한다. 같은 세션의 같은 단어는 한 번만 센다. 응답은 `{"items": [{"word": "...", "count": 3}]}`이고 `count` 내림차순, 상위 20개다. 정답 단어를 제출했다면 순위에 포함하지만 정답이라고 표시하지는 않는다.
 
 에러 응답: `{"error": "..."}` (프론트엔드 호환)
 
